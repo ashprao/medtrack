@@ -1,0 +1,24 @@
+# Build artifacts
+build/
+MedTrack.app/
+MedTrack-Universal.dmg
+MedTrack.dmg
+
+# System files
+.DS_Store
+
+# Go specific
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
+
+# IDE specific
+.idea/
+.vscode/
+*.swp
+*.swo
