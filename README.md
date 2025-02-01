@@ -2,6 +2,27 @@
 
 MedTrack is a desktop application built in Go using the Fyne toolkit for managing medication schedules and tracking daily intake. This project was developed entirely through AI pair programming using Claude Sonnet (via the Cline extension for VSCode), demonstrating the capabilities of AI-assisted software development. Every line of code, from architecture decisions to implementation details, was generated through natural language interaction with the AI, without manual coding.
 
+## Screenshots
+
+### Medication Management
+![Medication List](screenshots/medication_list.png)
+*Main view showing medication cards with dosage, timing, and instructions*
+
+### Daily Intake Tracking
+![Daily Intake](screenshots/daily_intake.png)
+*Daily medication schedule grouped by morning, afternoon, and night*
+
+### Medication Form
+![Edit Medication](screenshots/edit_medication.png)
+*Comprehensive form for adding and editing medication details*
+
+### Help & About
+![Help View](screenshots/help.png)
+*Built-in help documentation*
+
+![About View](screenshots/about.png)
+*Application information and version details*
+
 ## Features
 
 - **Medication Management**
