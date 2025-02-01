@@ -45,15 +45,19 @@ func NewMedicationList(onSave func(med *models.Medication) error, onDelete func(
 		list.showFormView(nil) // nil indicates new medication
 	})
 
-	list.listView = container.NewVBox(
-		container.NewHBox(
-			widget.NewLabel("Medications"),
-			list.addButton,
-		),
+	// Create header
+	header := container.NewHBox(
+		widget.NewLabel("Medications"),
+		list.addButton,
 	)
 
-	// Create main container with list view initially visible
-	list.mainContainer = container.NewMax(list.listView)
+	// Create list view with header and scrollable content
+	list.listView = container.NewVBox(header)
+	scrollContainer := container.NewVScroll(list.listView)
+	scrollContainer.SetMinSize(fyne.NewSize(300, 400))
+
+	// Create main container with scrollable list view initially visible
+	list.mainContainer = container.NewMax(scrollContainer)
 	list.container = list.mainContainer
 	return list
 }
@@ -198,7 +202,9 @@ func (m *MedicationList) showFormView(med *models.Medication) {
 // Show list view and hide form view
 func (m *MedicationList) showListView() {
 	m.mainContainer.RemoveAll()
-	m.mainContainer.Add(m.listView)
+	scrollContainer := container.NewVScroll(m.listView)
+	scrollContainer.SetMinSize(fyne.NewSize(300, 400))
+	m.mainContainer.Add(scrollContainer)
 	m.EnableAllButtons()
 }
 
