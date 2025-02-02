@@ -1,194 +1,147 @@
-# MedTrack
+# MedTrack: An AI Pair Programming Experiment
 
-MedTrack is a desktop application built in Go using the Fyne toolkit for managing medication schedules and tracking daily intake. This project was developed entirely through AI pair programming using Claude Sonnet (via the Cline extension for VSCode), demonstrating the capabilities of AI-assisted software development. Every line of code, from architecture decisions to implementation details, was generated through natural language interaction with the AI, without manual coding.
+## The Experiment
 
-## Screenshots
+This project represents a unique experiment in AI pair programming, where I built a complete medication tracking application without writing a single line of code manually. Every aspect of development was handled through natural language interaction with Claude (claude-3.5-sonnet) via the Cline extension in VSCode.
 
-### Medication Management
+### The Goal
+Could we create a fully functional, production-quality application solely through AI programming? I chose Go and Fyne UI as the foundation, and let the AI handle everything else - from suggesting SQLite for storage to implementing a clean MVC architecture.
+
+### Key Findings
+
+🌟 **What Worked Well**
+1. **Complete Automation**
+   - AI suggested architectural patterns
+   - Cline handled all file operations
+   - Automated testing and debugging
+   - Generated comprehensive documentation
+
+2. **Sophisticated Debugging**
+   - When the medication listing broke, Claude showed impressive adaptability
+   - Evolved from static code analysis to strategic logging
+   - Successfully diagnosed and fixed complex issues
+
+⚠️ **Critical Challenges**
+The most significant insight came from UI state management issues:
+- Forms would break 3-4 times during development
+- Each regression triggered multiple AI fix attempts
+- While initial development was lightning fast...
+- Repeated fixes consumed significant credits
+- Time savings were partially offset by regression cycles
+
+This revealed a crucial trade-off: AI's rapid initial development can be offset by recurring issues and credit consumption from repeated fix attempts.
+
+### Development Journey
+For a deep dive into the AI pair programming experience, including detailed insights into the challenges, successes, and lessons learned, see the [Development Journey](docs/development-journey.md) documentation.
+
+---
+
+## The Application
+
+MedTrack is a desktop application for managing medication schedules and tracking daily intake, demonstrating what's possible with AI-driven development.
+
+### Screenshots
+
+#### Medication Management
 ![Medication List](screenshots/medication_list.png)
 *Main view showing medication cards with dosage, timing, and instructions*
 
-### Daily Intake Tracking
+#### Daily Intake Tracking
 ![Daily Intake](screenshots/daily_intake.png)
 *Daily medication schedule grouped by morning, afternoon, and night*
 
-### Medication Form
+#### Medication Form
 ![Edit Medication](screenshots/edit_medication.png)
 *Comprehensive form for adding and editing medication details*
 
-### Help & About
-![Help View](screenshots/help.png)
-*Built-in help documentation*
-
-![About View](screenshots/about.png)
-*Application information and version details*
-
-## Features
+### Core Features
 
 - **Medication Management**
   - Add and edit medications with detailed information
   - Track dosage, frequency, and timing
-  - Record food-related instructions (before/after meals)
-  - Store special instructions and additional notes
-  - Set start and end dates for medications
+  - Record food-related instructions
+  - Store special instructions and notes
+  - Set start and end dates
 
 - **Daily Intake Tracking**
   - View medications organized by time of day
   - Track medication intake with checkboxes
   - See food instructions prominently
-  - View special instructions when needed
   - Group medications by morning, afternoon, and night
 
 - **User Interface**
   - Clean, intuitive interface
-  - Mobile-friendly design with scrollable forms
-  - Context-aware titles (Add vs Update)
-  - Responsive layout that adapts to screen size
-  - Cross-platform support (Desktop & Mobile)
-  - Optimized for touch interactions
+  - Mobile-friendly design
+  - Cross-platform support
+  - Responsive layout
 
-## Installation
+### Installation
 
-1. Ensure you have Go 1.23 or later installed
+1. Ensure Go 1.23+ installed
 2. Install Fyne dependencies:
    ```bash
    # macOS
    brew install golang gcc pkg-config
    ```
-3. Clone the repository:
+3. Clone and run:
    ```bash
    git clone https://github.com/ashprao/medtrack.git
    cd medtrack
-   ```
-4. Install dependencies:
-   ```bash
    go mod download
-   ```
-5. Build and run:
-   ```bash
    go run cmd/medtrack/main.go
    ```
 
-## Project Structure
+### Project Structure
 
 ```
 medtrack/
-├── cmd/
-│   └── medtrack/
-│       └── main.go           # Application entry point
+├── cmd/medtrack/          # Application entry
 ├── internal/
-│   ├── db/
-│   │   ├── database_test.go  # Database tests
-│   │   └── database.go       # Database management
-│   ├── models/
-│   │   ├── intake_test.go    # Intake model tests
-│   │   ├── intake.go         # Intake model
-│   │   ├── medication_test.go # Medication model tests
-│   │   └── medication.go     # Medication model
+│   ├── db/               # Database management
+│   ├── models/           # Core data models
 │   └── ui/
-│       ├── theme/            # UI theme customization
-│       └── views/
-│           ├── about.go      # About view
-│           ├── daily_intake.go # Daily intake view
-│           ├── help.go       # Help documentation view
-│           ├── medication_form.go # Medication form
-│           ├── medication_list_test.go # List view tests
-│           └── medication_list.go # Medication list view
-├── go.mod
-└── README.md
+│       ├── theme/        # UI customization
+│       └── views/        # UI components
+└── docs/                 # Documentation
 ```
 
-## Usage
+### Basic Usage
 
 1. **Adding Medications**
-   - Click "Add New Medication" in the Medications tab
-   - Form appears with "Add Medication Details" title
-   - Fill in medication details:
-     - Name and dosage
-     - Frequency and timing
-     - Food instructions (before/after meals)
-     - Special instructions and notes
-     - Additional notes (generic names, side effects)
-     - Start and end dates
-   - Scroll through form to access all fields
-   - Save button enables after making changes
-   - Click Save to confirm and return to list
-   - Click Cancel to discard and return to list
+   - Click "Add New Medication"
+   - Fill in details (name, dosage, timing)
+   - Add instructions and notes
+   - Save to return to list
 
-2. **Editing Medications**
-   - Find medication in the list
-   - Click Edit button
-   - Form appears with "Update Medication Details" title
-   - Update any details
-   - Scroll through form to access all fields
-   - Save button enables after making changes
-   - Click Update to save and return to list
-   - Click Cancel to discard and return to list
-   - Click Clear to reset all fields
-
-3. **Tracking Daily Intake**
+2. **Tracking Daily Intake**
    - Switch to Daily Intake tab
-   - View medications grouped by time
-   - Check off medications as taken
-   - View food and special instructions
-   - Track multiple doses throughout the day
+   - View medications by time
+   - Check off as taken
+   - View instructions as needed
 
-## Development
+### Development
 
 - Built with Go and Fyne UI toolkit
-- Uses SQLite for local data storage
-- Follows Go project layout conventions
-- Implements MVC-like architecture
-- Mobile-first responsive design
-- iOS and Android support via Fyne
+- SQLite for local storage
+- MVC-like architecture
+- Mobile-first design
+- Cross-platform support
 
-## Dependencies
+### Contributing
 
-- Go 1.23+
-- Fyne v2.5.3
-- SQLite3
-- Other dependencies as specified in go.mod
-
-## Contributing
-
-Contributions are welcome! Here's how you can help:
-
+Contributions welcome! Please:
 1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+2. Create a feature branch
+3. Add tests for new features
+4. Update documentation
+5. Submit a Pull Request
 
-Please make sure to:
-- Write clear commit messages
-- Add tests for new features
-- Update documentation as needed
-- Follow the existing code style
+### License
 
-## License
+MIT License - see [LICENSE](LICENSE) for details.
 
-This project is licensed under the MIT License - see below for details:
+---
 
-```
-MIT License
+## Looking Forward
 
-Copyright (c) 2025 Ashwin Rao
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
+While this experiment proved AI-only development is possible, it highlighted both potential and limitations. Success requires smart decisions about when to let AI iterate versus stepping in manually. The future of development might look like this - but with better handling of UI state and more refined AI interaction strategies.
