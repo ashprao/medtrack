@@ -1,5 +1,11 @@
 # MedTrack: An AI Pair Programming Experiment
 
+## Quick Install
+```bash
+go install github.com/ashprao/medtrack/cmd/medtrack@v0.1.0
+```
+This will install the latest stable version of MedTrack to your $GOPATH/bin directory (or $HOME/go/bin if GOPATH isn't set).
+
 ## The Experiment
 
 This project represents a unique experiment in AI pair programming, where I built a complete medication tracking application without writing a single line of code manually. Every aspect of development was handled through natural language interaction with Claude (claude-3.5-sonnet) via the Cline extension in VSCode.
@@ -77,6 +83,15 @@ MedTrack is a desktop application for managing medication schedules and tracking
 
 ### Installation
 
+There are two ways to install MedTrack:
+
+#### Option 1: Quick Install (Recommended for Users)
+```bash
+go install github.com/ashprao/medtrack/cmd/medtrack@v0.1.0
+```
+This will install the MedTrack binary to your $GOPATH/bin directory.
+
+#### Option 2: Build from Source (For Developers)
 1. Ensure Go 1.23+ installed
 2. Install Fyne dependencies:
    ```bash
@@ -90,6 +105,13 @@ MedTrack is a desktop application for managing medication schedules and tracking
    go mod download
    go run cmd/medtrack/main.go
    ```
+
+### Version History
+
+For detailed changes, see [CHANGELOG.md](CHANGELOG.md)
+
+#### Latest Release
+- **v0.1.0** (February 2025): Initial release with core medication tracking functionality, daily intake monitoring, and cross-platform GUI.
 
 ### Project Structure
 
