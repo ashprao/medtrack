@@ -5,10 +5,8 @@ import (
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
-)
 
-const (
-	AppVersion = "1.1.0"
+	"github.com/ashprao/medtrack/internal/version"
 )
 
 type About struct {
@@ -28,8 +26,8 @@ func NewAbout() *About {
 	content.Add(container.NewCenter(appName))
 
 	// Version
-	version := widget.NewRichText()
-	version.Segments = []widget.RichTextSegment{
+	versionText := widget.NewRichText()
+	versionText.Segments = []widget.RichTextSegment{
 		&widget.TextSegment{
 			Style: widget.RichTextStyle{
 				TextStyle: fyne.TextStyle{Bold: true},
@@ -37,10 +35,10 @@ func NewAbout() *About {
 			Text: "Version: ",
 		},
 		&widget.TextSegment{
-			Text: AppVersion + "\n\n",
+			Text: version.Version + "\n\n",
 		},
 	}
-	content.Add(version)
+	content.Add(versionText)
 
 	// Description
 	description := widget.NewRichTextWithText(
