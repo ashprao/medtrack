@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"medtrack/internal/models"
+	"github.com/ashprao/medtrack/internal/models"
 
 	_ "github.com/mattn/go-sqlite3"
 )

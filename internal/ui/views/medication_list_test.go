@@ -1,9 +1,10 @@
 package views
 
 import (
-	"medtrack/internal/models"
 	"testing"
 	"time"
+
+	"github.com/ashprao/medtrack/internal/models"
 
 	"fyne.io/fyne/v2/widget"
 )

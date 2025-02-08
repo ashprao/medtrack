@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"medtrack/internal/db"
-	"medtrack/internal/models"
-	"medtrack/internal/ui/views"
+	"github.com/ashprao/medtrack/internal/db"
+	"github.com/ashprao/medtrack/internal/models"
+	"github.com/ashprao/medtrack/internal/ui/views"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"

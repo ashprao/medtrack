@@ -1,10 +1,11 @@
 package db
 
 import (
-	"medtrack/internal/models"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/ashprao/medtrack/internal/models"
 )
 
 func setupTestDB(t *testing.T) (*Manager, func()) {
