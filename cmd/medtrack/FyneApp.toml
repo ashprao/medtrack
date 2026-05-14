@@ -1,0 +1,8 @@
+Website = "https://github.com/ashprao/medtrack"
+
+[Details]
+  Icon = "../../Icon.png"
+  Name = "MedTrack"
+  ID = "com.ashprao.medtrack"
+  Version = "1.1.0"
+  Build = 2

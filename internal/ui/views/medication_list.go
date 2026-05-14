@@ -8,53 +8,54 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
+	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/widget"
 )
 
 type MedicationList struct {
-	medications   []models.Medication
-	container     *fyne.Container
-	mainContainer *fyne.Container // Container to hold both list and form
-	listView      *fyne.Container // Container for the list view
-	formView      *MedicationForm // Form view
-	onSave        func(med *models.Medication) error
-	onDelete      func(med *models.Medication)
-	window        fyne.Window
-	addButton     *widget.Button
-	editButtons   []*widget.Button
-	deleteButtons []*widget.Button
+	medications    []models.Medication
+	container      *fyne.Container
+	mainContainer  *fyne.Container // Container to hold both list and form
+	listView       *fyne.Container // Container for the list view
+	formView       *MedicationForm // Form view
+	onSave         func(med *models.Medication) error
+	onDelete       func(med *models.Medication)
+	onToggleActive func(med *models.Medication, active bool)
+	window         fyne.Window
+	addButton      *widget.Button
+	editButtons    []*widget.Button
+	deleteButtons  []*widget.Button
 }
 
-func NewMedicationList(onSave func(med *models.Medication) error, onDelete func(med *models.Medication), window fyne.Window) *MedicationList {
+func NewMedicationList(onSave func(med *models.Medication) error, onDelete func(med *models.Medication), onToggleActive func(med *models.Medication, active bool), window fyne.Window) *MedicationList {
 	// Create list view with add button
 	list := &MedicationList{
-		medications:   make([]models.Medication, 0),
-		onSave:        onSave,
-		onDelete:      onDelete,
-		window:        window,
-		editButtons:   make([]*widget.Button, 0),
-		deleteButtons: make([]*widget.Button, 0),
+		medications:    make([]models.Medication, 0),
+		onSave:         onSave,
+		onDelete:       onDelete,
+		onToggleActive: onToggleActive,
+		window:         window,
+		editButtons:    make([]*widget.Button, 0),
+		deleteButtons:  make([]*widget.Button, 0),
 	}
 
-	list.addButton = widget.NewButton("Add New Medication", func() {
+	list.addButton = widget.NewButton("Add Medication", func() {
 		// Create form view when needed
 		if list.formView == nil {
-			list.formView = NewMedicationForm(list.handleFormSubmit)
+			list.formView = NewMedicationForm(list.handleFormSubmit, list.window)
 			list.formView.SetOnCancel(list.handleFormCancel)
 		}
 		list.showFormView(nil) // nil indicates new medication
 	})
 
 	// Create header
-	header := container.NewHBox(
-		widget.NewLabel("Medications"),
-		list.addButton,
+	header := container.NewBorder(nil, nil, nil, list.addButton,
+		widget.NewLabelWithStyle("My Medications", fyne.TextAlignCenter, fyne.TextStyle{Bold: true}),
 	)
 
 	// Create list view with header and scrollable content
 	list.listView = container.NewVBox(header)
 	scrollContainer := container.NewVScroll(list.listView)
-	scrollContainer.SetMinSize(fyne.NewSize(300, 400))
 
 	// Create main container with scrollable list view initially visible
 	list.mainContainer = container.NewMax(scrollContainer)
@@ -77,7 +78,7 @@ func (m *MedicationList) disableAllButtons() {
 	}
 }
 
-func (m *MedicationList) EnableAllButtons() {
+func (m *MedicationList) enableAllButtons() {
 	m.addButton.Enable()
 	for _, btn := range m.editButtons {
 		btn.Enable()
@@ -98,62 +99,38 @@ func (m *MedicationList) refresh() {
 	m.listView.Add(header)
 
 	if len(m.medications) == 0 {
-		m.listView.Add(widget.NewLabel("No medications added yet"))
+		m.listView.Add(container.NewCenter(container.NewPadded(
+			widget.NewLabel("No medications yet. Tap Add Medication to get started."),
+		)))
 		return
 	}
 
 	for _, med := range m.medications {
 		med := med // Create new variable for closure
-		// Create content for card
-		content := container.NewVBox(
-			widget.NewLabel("Frequency: "+med.Frequency),
-			widget.NewLabel("Purpose: "+med.Purpose),
-		)
 
-		// Add food instructions if specified
-		if med.FoodInstruction != "" && med.FoodInstruction != "No Food Restriction" {
-			foodLabel := widget.NewLabelWithStyle(
-				"Take "+med.FoodInstruction,
-				fyne.TextAlignLeading,
-				fyne.TextStyle{Bold: true},
-			)
-			content.Add(foodLabel)
+		// Active / Inactive toggle in the card header
+		activeCheck := widget.NewCheck("Active", nil)
+		activeCheck.SetChecked(med.Active)
+		activeCheck.OnChanged = func(on bool) {
+			if m.onToggleActive != nil {
+				m.onToggleActive(&med, on)
+			}
 		}
 
-		// Add special instructions if any
-		if med.Instructions != "" {
-			content.Add(widget.NewLabel("Instructions: " + med.Instructions))
-		}
-
-		// Add notes if any
-		if med.Notes != "" {
-			content.Add(widget.NewLabelWithStyle(
-				"Notes: "+med.Notes,
-				fyne.TextAlignLeading,
-				fyne.TextStyle{Italic: true},
-			))
-		}
-
-		// Create button container
-		buttonContainer := container.NewHBox()
-
-		// Add edit button
-		editBtn := widget.NewButton("Edit", nil) // Create button first
+		// Create button row (at top of card content for quick access)
+		editBtn := widget.NewButton("Edit", nil)
 		editBtn.OnTapped = func() {
 			// Create form view when needed
 			if m.formView == nil {
-				m.formView = NewMedicationForm(m.handleFormSubmit)
+				m.formView = NewMedicationForm(m.handleFormSubmit, m.window)
 				m.formView.SetOnCancel(m.handleFormCancel)
 			}
 			m.showFormView(&med)
 		}
-		buttonContainer.Add(editBtn)
 		m.editButtons = append(m.editButtons, editBtn)
 
-		// Add delete button
 		deleteBtn := widget.NewButton("Delete", func() {
-			// Show confirmation dialog
-			dialog := dialog.NewConfirm(
+			dlg := dialog.NewConfirm(
 				"Delete Medication",
 				fmt.Sprintf("Are you sure you want to delete %s? This will also remove all intake records.", med.Name),
 				func(confirmed bool) {
@@ -161,23 +138,65 @@ func (m *MedicationList) refresh() {
 						m.onDelete(&med)
 					}
 				},
-				fyne.CurrentApp().Driver().AllWindows()[0],
+				m.window,
 			)
-			dialog.Show()
+			dlg.Show()
 		})
 		deleteBtn.Importance = widget.DangerImportance
-		buttonContainer.Add(deleteBtn)
 		m.deleteButtons = append(m.deleteButtons, deleteBtn)
 
+		buttonContainer := container.NewHBox(editBtn, layout.NewSpacer(), deleteBtn)
+
+		// Build structured key/value info using widget.NewForm
+		infoForm := widget.NewForm(
+			widget.NewFormItem("Frequency", widget.NewLabel(med.Frequency)),
+			widget.NewFormItem("Purpose", widget.NewLabel(med.Purpose)),
+		)
+
+		content := container.NewVBox(infoForm)
+
+		// Add food instructions if specified
+		if med.FoodInstruction != "" && med.FoodInstruction != "No Food Restriction" {
+			content.Add(widget.NewLabelWithStyle(
+				"Take "+med.FoodInstruction,
+				fyne.TextAlignLeading,
+				fyne.TextStyle{Bold: true},
+			))
+		}
+
+		// Add special instructions if any
+		if med.Instructions != "" {
+			content.Add(widget.NewForm(
+				widget.NewFormItem("Instructions", widget.NewLabel(med.Instructions)),
+			))
+		}
+
+		// Add notes if any
+		if med.Notes != "" {
+			content.Add(widget.NewForm(
+				widget.NewFormItem("Notes", widget.NewLabelWithStyle(med.Notes, fyne.TextAlignLeading, fyne.TextStyle{Italic: true})),
+			))
+		}
+
+		// Edit/Delete at the bottom — destructive actions trail content per Apple HIG
+		content.Add(widget.NewSeparator())
 		content.Add(buttonContainer)
 
-		// Create card with all details
+		// Create card with all details; show inactive meds in a muted state
+		var cardTitle string
+		if med.Active {
+			cardTitle = med.Name
+		} else {
+			cardTitle = med.Name + "  [Paused]"
+		}
 		card := widget.NewCard(
-			med.Name,
+			cardTitle,
 			med.Dosage,
 			content,
 		)
-		m.listView.Add(card)
+		// Place the active checkbox trailing in the card's top-right area
+		cardWithToggle := container.NewBorder(nil, nil, nil, activeCheck, card)
+		m.listView.Add(cardWithToggle)
 	}
 }
 
@@ -194,7 +213,6 @@ func (m *MedicationList) showFormView(med *models.Medication) {
 		m.formView.Clear()
 	}
 	scroll := container.NewVScroll(m.formView.Container())
-	scroll.SetMinSize(fyne.NewSize(300, 400))
 	m.mainContainer.Add(scroll)
 	m.disableAllButtons()
 }
@@ -203,9 +221,8 @@ func (m *MedicationList) showFormView(med *models.Medication) {
 func (m *MedicationList) showListView() {
 	m.mainContainer.RemoveAll()
 	scrollContainer := container.NewVScroll(m.listView)
-	scrollContainer.SetMinSize(fyne.NewSize(300, 400))
 	m.mainContainer.Add(scrollContainer)
-	m.EnableAllButtons()
+	m.enableAllButtons()
 }
 
 // Handle form submission
@@ -228,7 +245,7 @@ func (m *MedicationList) handleFormSubmit(med *models.Medication) {
 
 		// Return to list view after successful save
 		m.showListView()
-		m.EnableAllButtons()
+		m.enableAllButtons()
 	}
 }
 

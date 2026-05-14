@@ -2,95 +2,54 @@ package views
 
 import (
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
 
 	"github.com/ashprao/medtrack/internal/version"
 )
 
-type About struct {
-	container *fyne.Container
-}
-
-func NewAbout() *About {
-	a := &About{}
-
-	// Create content
-	content := container.NewVBox()
-
-	// App name with large text
-	appName := canvas.NewText("MedTrack", nil)
-	appName.TextSize = 24
-	appName.TextStyle = fyne.TextStyle{Bold: true}
-	content.Add(container.NewCenter(appName))
-
-	// Version
-	versionText := widget.NewRichText()
-	versionText.Segments = []widget.RichTextSegment{
-		&widget.TextSegment{
-			Style: widget.RichTextStyle{
-				TextStyle: fyne.TextStyle{Bold: true},
-			},
-			Text: "Version: ",
-		},
-		&widget.TextSegment{
-			Text: version.Version + "\n\n",
-		},
+// ShowAboutDialog shows the About dialog.
+// On macOS the menu item must be labelled exactly "About" so Fyne's macOS
+// driver automatically moves it into the application menu (top-left menu bar).
+func ShowAboutDialog(parent fyne.Window) {
+	// Use metadata embedded by fyne package; fall back to the version constant
+	// for unpackaged dev builds (go run / go build without fyne package).
+	ver := fyne.CurrentApp().Metadata().Version
+	if ver == "" {
+		ver = version.Version
 	}
-	content.Add(versionText)
 
-	// Description
-	description := widget.NewRichTextWithText(
-		"MedTrack is a desktop application for managing medication schedules " +
-			"and tracking daily intake. It helps users maintain their medication " +
-			"regimen by providing clear schedules and easy tracking.\n\n")
-	description.Wrapping = fyne.TextWrapWord
-	content.Add(description)
+	appName := widget.NewRichText(&widget.TextSegment{
+		Style: widget.RichTextStyle{
+			TextStyle: fyne.TextStyle{Bold: true},
+			SizeName:  widget.RichTextStyleHeading.SizeName,
+			Alignment: fyne.TextAlignCenter,
+		},
+		Text: "MedTrack",
+	})
 
-	// Features header
-	featuresHeader := widget.NewRichTextWithText("Key Features:\n\n")
-	featuresHeader.Wrapping = fyne.TextWrapWord
-	featuresHeader.Segments[0].(*widget.TextSegment).Style.TextStyle = fyne.TextStyle{Bold: true}
-	content.Add(featuresHeader)
+	verLabel := widget.NewLabel("Version " + ver)
+	verLabel.Alignment = fyne.TextAlignCenter
 
-	// Features list
-	featuresList := widget.NewRichTextWithText(
-		"• Medication management with detailed information\n" +
-			"• Daily intake tracking with time-based organization\n" +
-			"• Food instruction support (before/after meals)\n" +
-			"• Special instructions and additional notes\n" +
-			"• Easy-to-use interface\n\n")
-	featuresList.Wrapping = fyne.TextWrapWord
-	content.Add(featuresList)
+	desc := widget.NewLabel(
+		"A desktop application for managing\nmedication schedules and daily intake tracking.")
+	desc.Alignment = fyne.TextAlignCenter
 
-	// Credits header
-	creditsHeader := widget.NewRichTextWithText("Credits:\n\n")
-	creditsHeader.Wrapping = fyne.TextWrapWord
-	creditsHeader.Segments[0].(*widget.TextSegment).Style.TextStyle = fyne.TextStyle{Bold: true}
-	content.Add(creditsHeader)
+	credits := widget.NewLabel("Created by Ashwin Rao\nBuilt with Go and Fyne")
+	credits.Alignment = fyne.TextAlignCenter
+	credits.Importance = widget.MediumImportance
 
-	// Credits content
-	creditsContent := widget.NewRichTextWithText("Created by Ashwin Rao\n\n")
-	creditsContent.Wrapping = fyne.TextWrapWord
-	content.Add(creditsContent)
+	content := container.NewVBox(
+		container.NewCenter(appName),
+		container.NewCenter(verLabel),
+		widget.NewSeparator(),
+		container.NewCenter(desc),
+		widget.NewSeparator(),
+		container.NewCenter(credits),
+	)
 
-	// Built with
-	builtWith := widget.NewRichTextWithText("Built with Go and Fyne UI Toolkit\n")
-	builtWith.Wrapping = fyne.TextWrapWord
-	builtWith.Segments[0].(*widget.TextSegment).Style.TextStyle = fyne.TextStyle{Italic: true}
-	content.Add(builtWith)
-
-	// Create scrollable container
-	scroll := container.NewVScroll(content)
-	scroll.SetMinSize(fyne.NewSize(600, 400))
-
-	// Add padding around content
-	a.container = container.NewPadded(scroll)
-
-	return a
-}
-
-func (a *About) Container() fyne.CanvasObject {
-	return a.container
+	d := dialog.NewCustom("About MedTrack", "Close", container.NewPadded(content), parent)
+	d.Resize(fyne.NewSize(360, 260))
+	d.Show()
 }

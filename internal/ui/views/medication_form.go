@@ -9,6 +9,8 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/dialog"
+	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/widget"
 )
 
@@ -28,9 +30,9 @@ type MedicationForm struct {
 	endDate       *widget.Entry
 	saveButton    *widget.Button
 	cancelButton  *widget.Button
-	clearButton   *widget.Button
 	onSubmit      func(med *models.Medication)
 	onCancel      func()
+	window        fyne.Window
 	currentMed    *models.Medication // Track current medication being edited
 	hasChanges    bool               // Track if form has unsaved changes
 }
@@ -41,12 +43,15 @@ var (
 		"Once Daily",
 		"Twice Daily",
 		"Three Times Daily",
+		"Four Times Daily",
+		"As Needed",
 	}
 
 	TimeOptions = []string{
-		"Morning (9:00 AM)",
-		"Afternoon (3:00 PM)",
-		"Night (9:00 PM)",
+		"Morning (9:00 AM – 12:00 PM)",
+		"Afternoon (12:00 PM – 5:00 PM)",
+		"Evening (5:00 PM – 9:00 PM)",
+		"Bedtime (10:00 PM)",
 	}
 
 	FoodOptions = []string{
@@ -57,13 +62,14 @@ var (
 	}
 
 	TimeMap = map[string]string{
-		"Morning (9:00 AM)":   "09:00",
-		"Afternoon (3:00 PM)": "15:00",
-		"Night (9:00 PM)":     "21:00",
+		"Morning (9:00 AM – 12:00 PM)":   "09:00",
+		"Afternoon (12:00 PM – 5:00 PM)": "15:00",
+		"Evening (5:00 PM – 9:00 PM)":    "18:00",
+		"Bedtime (10:00 PM)":             "22:00",
 	}
 )
 
-func NewMedicationForm(onSubmit func(med *models.Medication)) *MedicationForm {
+func NewMedicationForm(onSubmit func(med *models.Medication), window fyne.Window) *MedicationForm {
 	form := &MedicationForm{
 		nameEntry:     widget.NewEntry(),
 		dosageEntry:   widget.NewEntry(),
@@ -77,6 +83,7 @@ func NewMedicationForm(onSubmit func(med *models.Medication)) *MedicationForm {
 		startDate:     widget.NewEntry(),
 		endDate:       widget.NewEntry(),
 		onSubmit:      onSubmit,
+		window:        window,
 		hasChanges:    false,
 	}
 
@@ -89,21 +96,21 @@ func NewMedicationForm(onSubmit func(med *models.Medication)) *MedicationForm {
 	form.saveButton.Disable() // Initially disabled until changes
 
 	form.cancelButton = widget.NewButton("Cancel", form.cancel)
-	form.clearButton = widget.NewButton("Clear", form.Clear)
+	form.cancelButton.Importance = widget.LowImportance
 
 	// Set placeholders and defaults
 	form.nameEntry.SetPlaceHolder("Medication Name")
 	form.dosageEntry.SetPlaceHolder("Dosage (e.g., 50mg)")
-	form.freqSelect.SetSelected(FrequencyOptions[0]) // Default to once daily
+	form.freqSelect.SetSelected("Once Daily")
 	form.purposeEntry.SetPlaceHolder("Purpose/Treatment")
-	form.foodSelect.SetSelected(FoodOptions[3]) // Default to "No Food Restriction"
+	form.foodSelect.SetSelected("No Food Restriction")
 
 	// Initialize time selects for default frequency
-	form.updateTimeSelects(FrequencyOptions[0])
+	form.updateTimeSelects("Once Daily")
 	form.instrEntry.SetPlaceHolder("Special Instructions")
 	form.notesEntry.SetPlaceHolder("Additional Notes (e.g., generic name, side effects)")
-	form.startDate.SetPlaceHolder("Start Date (YYYY-MM-DD)")
-	form.endDate.SetPlaceHolder("End Date (YYYY-MM-DD, optional)")
+	form.startDate.SetPlaceHolder("e.g. 2025-06-30")
+	form.endDate.SetPlaceHolder("e.g. 2025-06-30 (optional)")
 
 	// Setup change handlers for all inputs
 	form.nameEntry.OnChanged = func(string) { form.markChanged() }
@@ -119,10 +126,10 @@ func NewMedicationForm(onSubmit func(med *models.Medication)) *MedicationForm {
 	form.startDate.OnChanged = func(string) { form.markChanged() }
 	form.endDate.OnChanged = func(string) { form.markChanged() }
 
-	// Create button container with improved layout for mobile
+	// Create button container
 	buttonContainer := container.NewHBox(
 		form.cancelButton,
-		form.clearButton,
+		layout.NewSpacer(),
 		form.saveButton,
 	)
 
@@ -151,6 +158,10 @@ func NewMedicationForm(onSubmit func(med *models.Medication)) *MedicationForm {
 }
 
 func (f *MedicationForm) getFrequencyString() string {
+	if f.freqSelect.Selected == "As Needed" {
+		return "as needed"
+	}
+
 	var count string
 	switch f.freqSelect.Selected {
 	case "Once Daily":
@@ -159,6 +170,8 @@ func (f *MedicationForm) getFrequencyString() string {
 		count = "twice daily"
 	case "Three Times Daily":
 		count = "three times daily"
+	case "Four Times Daily":
+		count = "four times daily"
 	default:
 		count = "once daily"
 	}
@@ -176,6 +189,10 @@ func (f *MedicationForm) getFrequencyString() string {
 }
 
 func (f *MedicationForm) parseFrequency(freq string) (string, []string) {
+	if strings.TrimSpace(strings.ToLower(freq)) == "as needed" {
+		return "As Needed", nil
+	}
+
 	parts := strings.Split(freq, " at ")
 	if len(parts) != 2 {
 		return "Once Daily", []string{TimeOptions[0]}
@@ -204,6 +221,8 @@ func (f *MedicationForm) parseFrequency(freq string) (string, []string) {
 		displayCount = "Twice Daily"
 	case "three times daily":
 		displayCount = "Three Times Daily"
+	case "four times daily":
+		displayCount = "Four Times Daily"
 	default:
 		displayCount = "Once Daily"
 	}
@@ -216,17 +235,37 @@ func (f *MedicationForm) markChanged() {
 	f.saveButton.Enable()
 }
 
+func (f *MedicationForm) validateTimeSelects() error {
+	seen := make(map[string]bool)
+	for _, ts := range f.timeSelects {
+		if ts.Selected == "" {
+			continue
+		}
+		if seen[ts.Selected] {
+			return fmt.Errorf("each dose must be scheduled at a different time of day; %q is selected more than once", ts.Selected)
+		}
+		seen[ts.Selected] = true
+	}
+	return nil
+}
+
 func (f *MedicationForm) submit() {
+	// Validate time slots have no duplicates
+	if err := f.validateTimeSelects(); err != nil {
+		dialog.ShowInformation("Invalid Times", err.Error(), f.window)
+		return
+	}
+
 	// Validate required fields
 	if f.nameEntry.Text == "" || f.dosageEntry.Text == "" || f.startDate.Text == "" {
-		f.saveButton.Enable()
+		dialog.ShowInformation("Missing Fields", "Please fill in Name, Dosage, and Start Date.", f.window)
 		return
 	}
 
 	// Parse dates
 	startDate, err := time.Parse("2006-01-02", f.startDate.Text)
 	if err != nil {
-		f.saveButton.Enable()
+		dialog.ShowInformation("Invalid Date", "Start Date must be in YYYY-MM-DD format, e.g. 2025-06-30.", f.window)
 		return
 	}
 
@@ -234,7 +273,7 @@ func (f *MedicationForm) submit() {
 	if f.endDate.Text != "" {
 		parsed, err := time.Parse("2006-01-02", f.endDate.Text)
 		if err != nil {
-			f.saveButton.Enable()
+			dialog.ShowInformation("Invalid Date", "End Date must be in YYYY-MM-DD format, e.g. 2025-06-30.", f.window)
 			return
 		}
 		endDate = &parsed
@@ -256,6 +295,7 @@ func (f *MedicationForm) submit() {
 	if f.currentMed != nil {
 		med.ID = f.currentMed.ID
 		med.CreatedAt = f.currentMed.CreatedAt
+		med.Active = f.currentMed.Active
 	}
 
 	// Call onSubmit with the new medication
@@ -304,13 +344,17 @@ func (f *MedicationForm) updateTimeSelects(freq string) {
 		count = 2
 	case "Three Times Daily":
 		count = 3
+	case "Four Times Daily":
+		count = 4
+	case "As Needed":
+		count = 0
 	default:
 		count = 1
 	}
 
 	for i := 0; i < count; i++ {
 		timeSelect := widget.NewSelect(TimeOptions, nil)
-		timeSelect.SetSelected(TimeOptions[0]) // Default to morning
+		timeSelect.SetSelected(TimeOptions[i]) // Cascade: Dose 1→Morning, 2→Afternoon, 3→Evening, 4→Bedtime
 		timeSelect.OnChanged = func(string) { f.markChanged() }
 		f.timeSelects = append(f.timeSelects, timeSelect)
 		f.timeContainer.Add(timeSelect)

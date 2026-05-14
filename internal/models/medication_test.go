@@ -31,6 +31,12 @@ func TestParseFrequency(t *testing.T) {
 			wantTimes:      []string{"09:00", "14:00", "21:00"},
 		},
 		{
+			name:           "four times daily",
+			input:          "four times daily at 08:00, 14:00, 20:00, 22:00",
+			wantTimesDaily: 4,
+			wantTimes:      []string{"08:00", "14:00", "20:00", "22:00"},
+		},
+		{
 			name:           "invalid format defaults to once daily",
 			input:          "invalid format",
 			wantTimesDaily: 1,
@@ -47,6 +53,12 @@ func TestParseFrequency(t *testing.T) {
 			input:          "three times daily at 21:00, 09:00, 14:00",
 			wantTimesDaily: 3,
 			wantTimes:      []string{"09:00", "14:00", "21:00"},
+		},
+		{
+			name:           "as needed PRN",
+			input:          "as needed",
+			wantTimesDaily: 0,
+			wantTimes:      []string{},
 		},
 	}
 

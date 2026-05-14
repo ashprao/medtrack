@@ -22,6 +22,8 @@ type Medication struct {
 	EndDate         *time.Time // Optional end date
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
+	DeletedAt       *time.Time // Non-nil when the medication has been soft-deleted
+	Active          bool       // false = paused; excluded from Daily Intake generation
 }
 
 // Validate checks if the medication has all required fields and valid values
@@ -58,6 +60,13 @@ func ParseFrequency(freq string) Frequency {
 
 	log.Printf("Parsing frequency: %s", freq)
 
+	// Handle PRN (as-needed) medications
+	if strings.TrimSpace(strings.ToLower(freq)) == "as needed" {
+		f.TimesPerDay = 0
+		f.Times = []string{}
+		return f
+	}
+
 	// Split frequency into count and times
 	parts := strings.Split(freq, " at ")
 	if len(parts) != 2 {
@@ -76,6 +85,8 @@ func ParseFrequency(freq string) Frequency {
 		f.TimesPerDay = 2
 	case "three times daily":
 		f.TimesPerDay = 3
+	case "four times daily":
+		f.TimesPerDay = 4
 	default:
 		f.TimesPerDay = 1
 	}
