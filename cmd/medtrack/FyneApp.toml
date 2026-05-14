@@ -4,5 +4,5 @@ Website = "https://github.com/ashprao/medtrack"
   Icon = "../../Icon.png"
   Name = "MedTrack"
   ID = "com.ashprao.medtrack"
-  Version = "1.1.0"
-  Build = 2
+  Version = "1.2.0"
+  Build = 3
