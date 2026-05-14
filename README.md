@@ -68,7 +68,7 @@ MedTrack lets you maintain a medication list, view a daily schedule grouped by t
 ### Option 1 — Quick install (end users)
 
 ```bash
-go install github.com/ashprao/medtrack/cmd/medtrack@latest
+go install github.com/ashprao/medtrack/cmd/medtrack@v1.2.0
 ```
 
 The binary is installed to `$GOPATH/bin` (or `~/go/bin` if `GOPATH` is not set). Ensure that directory is on your `$PATH`.
