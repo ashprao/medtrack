@@ -207,9 +207,9 @@ func main() {
 			if medicationLog != nil {
 				medicationLog.RefreshData()
 			}
-		}, func(medID int64) {
+		}, func(medID int64, takenAt time.Time) {
 			// PRN "Record Use" handler
-			if err := dbManager.AddPRNIntake(medID); err != nil {
+			if err := dbManager.AddPRNIntake(medID, takenAt); err != nil {
 				dialog.ShowError(err, mainWindow)
 				return
 			}
@@ -219,7 +219,7 @@ func main() {
 		})
 
 		// Initialize medication log view
-		medicationLog = views.NewMedicationLog(dbManager)
+		medicationLog = views.NewMedicationLog(dbManager, mainWindow)
 
 		// Ensure and load initial daily intakes (active medications only)
 		activeMeds := filterActiveMeds(medications)

@@ -2,6 +2,7 @@ package views
 
 import (
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
@@ -29,6 +30,11 @@ func ShowAboutDialog(parent fyne.Window) {
 		Text: "MedTrack",
 	})
 
+	img := canvas.NewImageFromResource(resourceIconPng)
+	img.FillMode = canvas.ImageFillContain
+	img.SetMinSize(fyne.NewSize(80, 80))
+	iconWidget := container.NewCenter(img)
+
 	verLabel := widget.NewLabel("Version " + ver)
 	verLabel.Alignment = fyne.TextAlignCenter
 
@@ -41,6 +47,7 @@ func ShowAboutDialog(parent fyne.Window) {
 	credits.Importance = widget.MediumImportance
 
 	content := container.NewVBox(
+		iconWidget,
 		container.NewCenter(appName),
 		container.NewCenter(verLabel),
 		widget.NewSeparator(),
@@ -50,6 +57,6 @@ func ShowAboutDialog(parent fyne.Window) {
 	)
 
 	d := dialog.NewCustom("About MedTrack", "Close", container.NewPadded(content), parent)
-	d.Resize(fyne.NewSize(360, 260))
+	d.Resize(fyne.NewSize(360, 370))
 	d.Show()
 }

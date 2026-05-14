@@ -20,6 +20,7 @@ import (
 type MedicationLog struct {
 	container    *fyne.Container
 	dbManager    *db.Manager
+	window       fyne.Window
 	fromDate     *widget.Entry
 	toDate       *widget.Entry
 	intakes      []models.Intake
@@ -40,9 +41,10 @@ type logEntry struct {
 }
 
 // NewMedicationLog creates a new medication log view
-func NewMedicationLog(dbManager *db.Manager) *MedicationLog {
+func NewMedicationLog(dbManager *db.Manager, window fyne.Window) *MedicationLog {
 	m := &MedicationLog{
 		dbManager:   dbManager,
+		window:      window,
 		intakes:     make([]models.Intake, 0),
 		medications: make([]models.Medication, 0),
 	}
@@ -50,28 +52,40 @@ func NewMedicationLog(dbManager *db.Manager) *MedicationLog {
 	// Create title
 	title := widget.NewLabelWithStyle("Medication Intake History", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
 
-	// Create date range selector
+	// Create date range selectors with calendar pickers.
 	now := time.Now()
 	oneWeekAgo := now.AddDate(0, 0, -7)
 
-	m.fromDate = widget.NewEntry()
-	m.fromDate.SetText(oneWeekAgo.Format("2006-01-02"))
-	m.fromDate.SetPlaceHolder("e.g. 2025-06-30")
-
-	m.toDate = widget.NewEntry()
-	m.toDate.SetText(now.Format("2006-01-02"))
-	m.toDate.SetPlaceHolder("e.g. 2025-06-30")
+	var fromDateContainer, toDateContainer *fyne.Container
+	m.fromDate, fromDateContainer = newDateEntryWithPicker(oneWeekAgo, window, false)
+	m.toDate, toDateContainer = newDateEntryWithPicker(now, window, false, m.fromDate)
 
 	refreshButton := widget.NewButtonWithIcon("Refresh", theme.ViewRefreshIcon(), func() {
-		from, err := time.Parse("2006-01-02", m.fromDate.Text)
+		today := time.Now()
+		startOfToday := time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, time.Local)
+
+		from, err := time.ParseInLocation("2006-01-02", m.fromDate.Text, time.Local)
 		if err != nil {
-			log.Printf("Invalid from date: %v", err)
+			dialog.ShowInformation("Invalid Date", "From date must be in YYYY-MM-DD format, e.g. 2026-05-14.", m.window)
+			return
+		}
+		if from.After(startOfToday) {
+			dialog.ShowInformation("Invalid Date", "From date cannot be in the future.", m.window)
 			return
 		}
 
-		to, err := time.Parse("2006-01-02", m.toDate.Text)
+		to, err := time.ParseInLocation("2006-01-02", m.toDate.Text, time.Local)
 		if err != nil {
-			log.Printf("Invalid to date: %v", err)
+			dialog.ShowInformation("Invalid Date", "To date must be in YYYY-MM-DD format, e.g. 2026-05-14.", m.window)
+			return
+		}
+		if to.After(startOfToday) {
+			dialog.ShowInformation("Invalid Date", "To date cannot be in the future.", m.window)
+			return
+		}
+
+		if to.Before(from) {
+			dialog.ShowInformation("Invalid Date Range", "To date must be on or after From date.", m.window)
 			return
 		}
 
@@ -81,14 +95,10 @@ func NewMedicationLog(dbManager *db.Manager) *MedicationLog {
 		m.UpdateData(from, to)
 	})
 
-	dateEntries := container.NewGridWithColumns(4,
-		widget.NewLabel("From:"),
-		m.fromDate,
-		widget.NewLabel("To:"),
-		m.toDate,
-	)
+	fromGroup := container.NewVBox(widget.NewLabel("From:"), fromDateContainer)
+	toGroup := container.NewVBox(widget.NewLabel("To:"), toDateContainer)
 	m.dateRangeBox = container.NewVBox(
-		dateEntries,
+		container.NewGridWithColumns(2, fromGroup, toGroup),
 		container.NewBorder(nil, nil, nil, refreshButton, nil),
 	)
 
@@ -295,8 +305,48 @@ func (m *MedicationLog) renderTable() {
 		})
 		deleteBtn.Importance = widget.LowImportance
 
-		// Top row: meta left, status centre, delete right
-		topRow := container.NewBorder(nil, nil, metaLabel, deleteBtn, statusLabel)
+		// Mark Taken button — only shown for Missed entries
+		var markTakenBtn *widget.Button
+		if statusText == "Missed" {
+			markTakenBtn = widget.NewButton("Mark Taken", func() {
+				formItem, getTime := newTimeFormItem("Time taken", e.scheduledAt)
+				d := dialog.NewForm(
+					"Mark as Taken",
+					"Confirm",
+					"Cancel",
+					[]*widget.FormItem{formItem},
+					func(confirmed bool) {
+						if !confirmed {
+							return
+						}
+						h, min, err := getTime()
+						if err != nil {
+							return
+						}
+						takenAt := time.Date(
+							e.scheduledAt.Year(), e.scheduledAt.Month(), e.scheduledAt.Day(),
+							h, min, 0, 0, e.scheduledAt.Location(),
+						)
+						if err := m.dbManager.MarkIntakeTaken(e.intakeID, takenAt); err != nil {
+							log.Printf("Error marking intake %d as taken: %v", e.intakeID, err)
+							return
+						}
+						m.RefreshData()
+					},
+					fyne.CurrentApp().Driver().AllWindows()[0],
+				)
+				d.Show()
+			})
+			markTakenBtn.Importance = widget.WarningImportance
+		}
+
+		// Top row: meta left, status centre, [mark taken] + delete right
+		var topRow *fyne.Container
+		if markTakenBtn != nil {
+			topRow = container.NewBorder(nil, nil, metaLabel, container.NewHBox(markTakenBtn, deleteBtn), statusLabel)
+		} else {
+			topRow = container.NewBorder(nil, nil, metaLabel, deleteBtn, statusLabel)
+		}
 
 		// Medication name (bold, wrapping) + dosage (muted)
 		medLabel := widget.NewLabelWithStyle(

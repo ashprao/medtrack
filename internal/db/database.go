@@ -386,15 +386,13 @@ func timeBucket(hour int) string {
 	}
 }
 
-// AddPRNIntake records an immediate "as needed" dose for the given medication.
-// The intake is created with status=taken and takenAt=now.
-func (m *Manager) AddPRNIntake(medID int64) error {
-	now := time.Now()
+// AddPRNIntake records an "as needed" dose for the given medication at takenAt.
+func (m *Manager) AddPRNIntake(medID int64, takenAt time.Time) error {
 	intake := &models.Intake{
 		MedicationID: medID,
-		ScheduledFor: now,
+		ScheduledFor: takenAt,
 		Status:       models.IntakeStatusTaken,
-		TakenAt:      &now,
+		TakenAt:      &takenAt,
 	}
 	return m.AddIntake(intake)
 }
@@ -483,6 +481,20 @@ func (m *Manager) DeleteIntake(id int64) error {
 	_, err := m.db.Exec(`DELETE FROM intakes WHERE id = ?`, id)
 	if err != nil {
 		return fmt.Errorf("error deleting intake: %v", err)
+	}
+	return nil
+}
+
+// MarkIntakeTaken updates a missed (or pending) intake to status=taken with the
+// provided takenAt time. Used by the Log view to correct a forgotten dose.
+func (m *Manager) MarkIntakeTaken(intakeID int64, takenAt time.Time) error {
+	now := time.Now()
+	_, err := m.db.Exec(
+		`UPDATE intakes SET status = ?, taken_at = ?, updated_at = ? WHERE id = ?`,
+		models.IntakeStatusTaken, takenAt, now, intakeID,
+	)
+	if err != nil {
+		return fmt.Errorf("error marking intake as taken: %v", err)
 	}
 	return nil
 }

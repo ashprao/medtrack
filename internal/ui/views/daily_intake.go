@@ -5,6 +5,7 @@ import (
 	"image/color"
 	"log"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -14,9 +15,140 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/widget"
 )
+
+// capWidthLayout is a single-child layout that enforces a maximum width.
+// The child is given at most maxW units; the container's MinSize reports
+// min(child.MinSize().Width, maxW) so Border/HBox honour the cap.
+type capWidthLayout struct{ maxW float32 }
+
+func (c capWidthLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
+	if len(objects) == 0 {
+		return
+	}
+	w := size.Width
+	if w > c.maxW {
+		w = c.maxW
+	}
+	objects[0].Resize(fyne.NewSize(w, size.Height))
+	objects[0].Move(fyne.NewPos(0, 0))
+}
+
+func (c capWidthLayout) MinSize(objects []fyne.CanvasObject) fyne.Size {
+	if len(objects) == 0 {
+		return fyne.NewSize(c.maxW, 0)
+	}
+	s := objects[0].MinSize()
+	if s.Width > c.maxW {
+		s.Width = c.maxW
+	}
+	return s
+}
+
+// minWidthLayout is a single-child layout that enforces a minimum width,
+// letting the child grow beyond it but never shrink below it.
+type minWidthLayout struct{ minW float32 }
+
+func (l minWidthLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
+	if len(objects) == 0 {
+		return
+	}
+	objects[0].Resize(size)
+	objects[0].Move(fyne.NewPos(0, 0))
+}
+
+func (l minWidthLayout) MinSize(objects []fyne.CanvasObject) fyne.Size {
+	if len(objects) == 0 {
+		return fyne.NewSize(l.minW, 0)
+	}
+	s := objects[0].MinSize()
+	if s.Width < l.minW {
+		s.Width = l.minW
+	}
+	return s
+}
+
+// parseHourMinute parses a 12-hour time string "H:MM" or "HH:MM" (no AM/PM)
+// and returns the hour (1–12) and minute. Returns an error for invalid input.
+func parseHourMinute(s string) (hour, minute int, err error) {
+	s = strings.TrimSpace(s)
+	parts := strings.SplitN(s, ":", 2)
+	if len(parts) != 2 {
+		return 0, 0, fmt.Errorf("enter time as H:MM (e.g. 2:30)")
+	}
+	h, e1 := strconv.Atoi(strings.TrimSpace(parts[0]))
+	m, e2 := strconv.Atoi(strings.TrimSpace(parts[1]))
+	if e1 != nil || e2 != nil || h < 1 || h > 12 || m < 0 || m > 59 {
+		return 0, 0, fmt.Errorf("enter time as H:MM (e.g. 2:30)")
+	}
+	return h, m, nil
+}
+
+// newTimeFormItem builds a FormItem with a 12-hour time entry and an AM/PM
+// selector pre-filled from initial. Returns the FormItem and a getter that
+// returns the selected time as a 24-hour (hour, minute) pair.
+func newTimeFormItem(label string, initial time.Time) (*widget.FormItem, func() (int, int, error)) {
+	// Convert initial time to 12-hour display values
+	h := initial.Hour()
+	min := initial.Minute()
+	ampm := "AM"
+	displayHour := h
+	if h >= 12 {
+		ampm = "PM"
+		if h > 12 {
+			displayHour = h - 12
+		}
+	}
+	if displayHour == 0 {
+		displayHour = 12
+	}
+
+	timeEntry := widget.NewEntry()
+	timeEntry.SetText(fmt.Sprintf("%d:%02d", displayHour, min))
+	timeEntry.SetPlaceHolder("H:MM")
+	timeEntry.Validator = func(s string) error {
+		_, _, err := parseHourMinute(s)
+		return err
+	}
+
+	// Dropdown for AM/PM, capped to a small width so the time entry dominates.
+	ampmSelect := widget.NewSelect([]string{"AM", "PM"}, nil)
+	ampmSelect.SetSelected(ampm)
+	ampmCapped := container.New(capWidthLayout{maxW: 72}, ampmSelect)
+
+	hint := widget.NewLabel("e.g. 2:30")
+	hint.Importance = widget.LowImportance
+
+	// Border: capped Select anchored right, Entry fills the remaining space.
+	row := container.NewBorder(nil, nil, nil, ampmCapped, timeEntry)
+	// minWidthLayout ensures the row is wide enough that the time entry is
+	// clearly larger than the AM/PM dropdown (minW = 72 + ~150 for entry).
+	content := container.New(minWidthLayout{minW: 220}, container.NewVBox(row, hint))
+
+	getTime := func() (int, int, error) {
+		h12, m, err := parseHourMinute(timeEntry.Text)
+		if err != nil {
+			return 0, 0, err
+		}
+		// Convert 12-hour + AM/PM to 24-hour
+		switch ampmSelect.Selected {
+		case "PM":
+			if h12 != 12 {
+				h12 += 12
+			}
+		case "AM":
+			if h12 == 12 {
+				h12 = 0
+			}
+		}
+		return h12, m, nil
+	}
+
+	return widget.NewFormItem(label, content), getTime
+}
 
 // DailyIntake struct holds the data and UI components for displaying a daily intake of medications
 // This is the Publisher or Subject in the Observer pattern.
@@ -33,7 +165,7 @@ type DailyIntake struct {
 	// in the Observer pattern
 	onTake func(med *models.Medication, scheduledTime time.Time, taken bool)
 	// onPRNUse is called when the user taps "Record Use" for a PRN medication
-	onPRNUse func(medID int64)
+	onPRNUse func(medID int64, takenAt time.Time)
 	// intakes is a slice of all recorded intakes to track multiple doses
 	intakes []models.Intake
 	// cachedItems is a cache for the calculated intake items
@@ -49,7 +181,7 @@ type intakeItem struct {
 	doseTotal  int // total doses of this medication today (1 means no label needed)
 }
 
-func NewDailyIntake(onTake func(med *models.Medication, scheduledTime time.Time, taken bool), onPRNUse func(medID int64)) *DailyIntake {
+func NewDailyIntake(onTake func(med *models.Medication, scheduledTime time.Time, taken bool), onPRNUse func(medID int64, takenAt time.Time)) *DailyIntake {
 	d := &DailyIntake{
 		dateLabel:      widget.NewLabel(""),
 		onTake:         onTake,
@@ -224,9 +356,30 @@ func (d *DailyIntake) refresh() {
 			titleRow := container.NewHBox(nameLabel, layout.NewSpacer(), dosageLabel)
 
 			recordBtn := widget.NewButton("Record Use", func() {
-				if d.onPRNUse != nil {
-					d.onPRNUse(m.ID)
+				if d.onPRNUse == nil {
+					return
 				}
+				formItem, getTime := newTimeFormItem("Time taken", time.Now())
+				dlg := dialog.NewForm(
+					"Record Use — "+m.Name,
+					"Confirm",
+					"Cancel",
+					[]*widget.FormItem{formItem},
+					func(confirmed bool) {
+						if !confirmed {
+							return
+						}
+						h, min, err := getTime()
+						if err != nil {
+							return
+						}
+						now := time.Now()
+						takenAt := time.Date(now.Year(), now.Month(), now.Day(), h, min, 0, 0, now.Location())
+						d.onPRNUse(m.ID, takenAt)
+					},
+					fyne.CurrentApp().Driver().AllWindows()[0],
+				)
+				dlg.Show()
 			})
 
 			btnRow := container.NewHBox(recordBtn)

@@ -359,7 +359,7 @@ func TestAddPRNIntake(t *testing.T) {
 	assert.NoError(t, manager.SaveMedication(med))
 
 	before := time.Now()
-	assert.NoError(t, manager.AddPRNIntake(med.ID))
+	assert.NoError(t, manager.AddPRNIntake(med.ID, before))
 	after := time.Now()
 
 	intakes, err := manager.GetIntakes(before.Add(-time.Second), after.Add(time.Second))

@@ -80,8 +80,6 @@ func NewMedicationForm(onSubmit func(med *models.Medication), window fyne.Window
 		foodSelect:    widget.NewSelect(FoodOptions, nil),
 		instrEntry:    widget.NewMultiLineEntry(),
 		notesEntry:    widget.NewMultiLineEntry(),
-		startDate:     widget.NewEntry(),
-		endDate:       widget.NewEntry(),
 		onSubmit:      onSubmit,
 		window:        window,
 		hasChanges:    false,
@@ -109,8 +107,11 @@ func NewMedicationForm(onSubmit func(med *models.Medication), window fyne.Window
 	form.updateTimeSelects("Once Daily")
 	form.instrEntry.SetPlaceHolder("Special Instructions")
 	form.notesEntry.SetPlaceHolder("Additional Notes (e.g., generic name, side effects)")
-	form.startDate.SetPlaceHolder("e.g. 2025-06-30")
-	form.endDate.SetPlaceHolder("e.g. 2025-06-30 (optional)")
+
+	// Create date entries with calendar picker and hint label.
+	var startDateContainer, endDateContainer *fyne.Container
+	form.startDate, startDateContainer = newDateEntryWithPicker(time.Time{}, window, true)
+	form.endDate, endDateContainer = newDateEntryWithPicker(time.Time{}, window, true)
 
 	// Setup change handlers for all inputs
 	form.nameEntry.OnChanged = func(string) { form.markChanged() }
@@ -143,8 +144,8 @@ func NewMedicationForm(onSubmit func(med *models.Medication), window fyne.Window
 		widget.NewFormItem("Food Instructions", form.foodSelect),
 		widget.NewFormItem("Special Instructions", form.instrEntry),
 		widget.NewFormItem("Additional Notes", form.notesEntry),
-		widget.NewFormItem("Start Date", form.startDate),
-		widget.NewFormItem("End Date", form.endDate),
+		widget.NewFormItem("Start Date", startDateContainer),
+		widget.NewFormItem("End Date", endDateContainer),
 	)
 
 	// Create form container with title and buttons
@@ -274,6 +275,10 @@ func (f *MedicationForm) submit() {
 		parsed, err := time.Parse("2006-01-02", f.endDate.Text)
 		if err != nil {
 			dialog.ShowInformation("Invalid Date", "End Date must be in YYYY-MM-DD format, e.g. 2025-06-30.", f.window)
+			return
+		}
+		if parsed.Before(startDate) {
+			dialog.ShowInformation("Invalid Dates", "End Date must be on or after Start Date.", f.window)
 			return
 		}
 		endDate = &parsed
