@@ -1,6 +1,6 @@
 # MedTrack
 
-A desktop application for managing medication schedules and tracking daily intake. Built with Go and Fyne v2 for macOS.
+A desktop application for managing medication schedules and tracking daily intake. Built with Go and Fyne v2 for MacOS, Linux and Windows.
 
 ![Go 1.23+](https://img.shields.io/badge/Go-1.23+-00ADD8?logo=go&logoColor=white)
 ![Fyne v2](https://img.shields.io/badge/Fyne-v2.5.4-informational)
