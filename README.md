@@ -1,9 +1,9 @@
 # MedTrack
 
-A desktop application for managing medication schedules and tracking daily intake. Built with Go and Fyne v2 for MacOS, Linux and Windows.
+A cross-platform desktop application for managing medication schedules and tracking daily intake. Built with Go and Fyne v2 — runs natively on macOS, Linux, and Windows from a single codebase.
 
 ![Go 1.23+](https://img.shields.io/badge/Go-1.23+-00ADD8?logo=go&logoColor=white)
-![Fyne v2](https://img.shields.io/badge/Fyne-v2.5.4-informational)
+![Fyne v2](https://img.shields.io/badge/Fyne-v2.7.2-informational)
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow)
 
 ---
@@ -11,6 +11,9 @@ A desktop application for managing medication schedules and tracking daily intak
 ## Overview
 
 MedTrack lets you maintain a medication list, view a daily schedule grouped by time of day, mark doses as taken, and review a historical log with date-range filtering. Data is stored locally in a SQLite database — no network connection required.
+
+![About MedTrack](screenshots/about.png)
+*MedTrack v1.2.0 — About dialog*
 
 ---
 
@@ -45,9 +48,10 @@ MedTrack lets you maintain a medication list, view a daily schedule grouped by t
 
 ## Prerequisites
 
-- **Go 1.23+**
-- **macOS** (primary platform; Fyne supports Linux and Windows but these are untested)
-- **Xcode Command Line Tools** — required for CGO (`go-sqlite3` is a CGO package)
+All platforms require **Go 1.23+** and a C compiler (CGO is required by `go-sqlite3`).
+
+### macOS
+- **Xcode Command Line Tools**:
   ```bash
   xcode-select --install
   ```
@@ -55,8 +59,29 @@ MedTrack lets you maintain a medication list, view a daily schedule grouped by t
   ```bash
   brew install gcc pkg-config
   ```
-- **make** — pre-installed on macOS via Xcode Command Line Tools
+- **make** — pre-installed via Xcode Command Line Tools
 - **fyne CLI** (for packaging and install targets):
+  ```bash
+  make tools
+  ```
+
+### Linux
+- **gcc, pkg-config, and OpenGL/X11 headers**:
+  ```bash
+  sudo apt install gcc pkg-config libgl1-mesa-dev xorg-dev
+  ```
+  (Fedora/RHEL: `dnf install gcc pkg-config mesa-libGL-devel libXcursor-devel libXrandr-devel libXinerama-devel libXi-devel`)
+- **make** — usually pre-installed; otherwise `sudo apt install make`
+- **fyne CLI**:
+  ```bash
+  make tools
+  ```
+
+### Windows
+- **TDM-GCC** (or MSYS2 MinGW) for CGO support — download from [tdm-gcc.tdragon.net](https://tdm-gcc.tdragon.net)
+- **pkg-config** — available via MSYS2 (`pacman -S mingw-w64-x86_64-pkg-config`) or Chocolatey
+- **make** — via MSYS2 or `choco install make`
+- **fyne CLI**:
   ```bash
   make tools
   ```
@@ -90,11 +115,13 @@ go build -o MedTrack ./cmd/medtrack
 ./MedTrack
 ```
 
-### Option 3 — Install as a macOS app bundle
+### Option 3 — Install as a native app bundle
 
 ```bash
-make install  # packages and copies MedTrack.app to /Applications
+make install  # packages and installs to the system app location
 ```
+
+Fyne resolves the install location per platform: `/Applications` on macOS, `~/.local/share/applications` on Linux, and Program Files on Windows.
 
 ---
 
@@ -111,24 +138,56 @@ All common tasks are covered by the `Makefile`. Run `make` (or `make help`) to s
 | `make run` | Build and launch the app |
 | `make clean` | Remove all build artifacts |
 
-### macOS Packaging
+### Packaging
+
+`make package` and `make package-release` are platform-aware — they detect the host OS and produce the appropriate artifact:
+
+| Host OS | Artifact |
+|---------|----------|
+| macOS | `MedTrack.app` bundle |
+| Linux | `MedTrack.tar.xz` |
+| Windows | `MedTrack.zip` |
 
 | Command | Description |
 |---------|-------------|
-| `make package` | Create `MedTrack.app` bundle (debug build) |
-| `make package-release` | Create `MedTrack.app` with debug symbols stripped |
-| `make install` | Package and copy to `/Applications` |
-| `make dmg` | Release app + ad-hoc sign + wrap into `MedTrack-<version>.dmg` |
-| `make dmg-signed` | Release app + Developer ID sign + wrap + sign DMG |
+| `make package` | Create native package (debug build) |
+| `make package-release` | Create native package with debug symbols stripped |
+| `make install` | Package and install to system app location |
 
-### Code Signing
+### Cross-platform distribution
+
+Build for any platform from any host using `fyne-cross` (no virtual machine or Docker required when targeting the host OS):
+
+| Command | Description |
+|---------|-------------|
+| `make dist-darwin` | Build macOS bundles (amd64 + arm64) → `fyne-cross/dist/` |
+| `make dist-linux` | Build Linux packages (amd64 + arm64) → `fyne-cross/dist/` |
+| `make dist-windows` | Build Windows packages (amd64) → `fyne-cross/dist/` |
+| `make dist` | Build all three platforms in one shot |
+
+### macOS Code Signing
 
 | Command | Description |
 |---------|-------------|
 | `make sign-adhoc` | Ad-hoc sign `MedTrack.app` (runs on your Mac only, no Apple account needed) |
 | `make sign` | Developer ID sign (requires `DEVELOPER_ID` env var) |
+| `make dmg` | Release app + ad-hoc sign + wrap into `MedTrack-<version>.dmg` |
+| `make dmg-signed` | Release app + Developer ID sign + wrap + sign DMG |
 
-For distribution to other Macs, set your certificate before running `make dmg-signed`:
+**Ad-hoc signed DMG (no Apple account needed)**
+
+`make dmg` produces an ad-hoc signed DMG. Recipients will see a Gatekeeper warning on first launch. Two ways to bypass it:
+
+- **Right-click (or Control-click) → Open** on `MedTrack.app`, then click **Open** in the dialog — grants a permanent exception for that copy.
+- Or remove the quarantine flag from the terminal after mounting the DMG:
+
+  ```bash
+  xattr -dr com.apple.quarantine /Applications/MedTrack.app
+  ```
+
+After the first launch the app runs normally. No certificate or Apple Developer account required.
+
+**For distribution to other Macs with a Developer ID certificate**, set your certificate before running `make dmg-signed`:
 
 ```bash
 export DEVELOPER_ID="Developer ID Application: Your Name (TEAMID)"
@@ -147,13 +206,6 @@ export TEAM_ID="YOURTEAMID"
 make release-signed   # version check + sign + DMG + notarize + staple
 ```
 
-### Cross-platform
-
-| Command | Description |
-|---------|-------------|
-| `make dist` | Build darwin/amd64 + darwin/arm64 via `fyne-cross` → `fyne-cross/dist/` |
-| `make tools` | Install `fyne` and `fyne-cross` CLIs to `$GOPATH/bin` |
-
 ---
 
 ## Usage
@@ -165,7 +217,7 @@ make release-signed   # version check + sign + DMG + notarize + staple
 | **Log** | Review historical intake records; set a date range and refresh |
 | **Help** | In-app usage guidance |
 
-The **app menu** (macOS) exposes **About** and **Preferences** (data management).
+**About** and **Preferences** (data management) are accessible from the app menu on macOS, and from the menu bar on Linux and Windows.
 
 ---
 
@@ -243,6 +295,7 @@ See [CHANGELOG.md](CHANGELOG.md) for full details.
 
 | Version | Date | Summary |
 |---------|------|---------|
+| v1.2.0 | May 2026 | Calendar date pickers, date validation, cross-platform packaging |
 | v1.1.0 | May 2026 | PRN medications, smart taken-at recording, log layout refactor, bedtime scheduling, soft-delete |
 | v0.2.0 | March 2025 | Medication log with date filtering |
 | v0.1.0 | February 2025 | Initial release |

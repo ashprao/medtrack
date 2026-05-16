@@ -9,13 +9,15 @@ This document is the primary technical reference for contributors. It covers the
 | Component | Technology | Version |
 |-----------|-----------|---------|
 | Language | Go | 1.23.2 |
-| GUI framework | [Fyne v2](https://fyne.io) | 2.5.4 |
+| GUI framework | [Fyne v2](https://fyne.io) | 2.7.2 |
 | Database driver | [go-sqlite3](https://github.com/mattn/go-sqlite3) | 1.14.24 |
 | App metadata | FyneApp.toml | — |
 
-**CGO is required.** `go-sqlite3` compiles a C SQLite amalgamation. Ensure `gcc` and `pkg-config` are available before building (see README prerequisites).
+**CGO is required.** `go-sqlite3` compiles a C SQLite amalgamation. Ensure `gcc` and `pkg-config` are available before building (see README prerequisites for per-platform instructions).
 
-**App identity:** `com.ashprao.medtrack` (defined in `FyneApp.toml`). Fyne uses this as the macOS bundle identifier and for `fyne/app.NewWithID`.
+**Cross-platform by design.** Go and Fyne v2 were chosen specifically so MedTrack compiles and runs natively on macOS, Linux, and Windows from a single codebase. The data layer, models, and core UI are fully platform-agnostic. Some UI behaviours noted in this document (app menu placement, About/Preferences lift) are Fyne platform-specific features on macOS — they are implementation details, not platform restrictions.
+
+**App identity:** `com.ashprao.medtrack` (defined in `FyneApp.toml`). Fyne uses this as the macOS bundle identifier, Linux desktop entry ID, and Windows registry key for `fyne/app.NewWithID`.
 
 ---
 

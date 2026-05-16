@@ -15,11 +15,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Calendar date pickers** — medication form start/end dates and log filter From/To dates now have a calendar picker button alongside the text entry
 - **Date format hint** — a subtle label under each date field shows the expected `YYYY-MM-DD` format with today's date as an example
 - **Min-date enforcement on To field** — the log filter To date cannot be set to a date before the From date, enforced in both the text entry validator and the calendar picker
+- **Linux and Windows packaging** — `make package` and `make package-release` are now platform-aware; they detect the host OS and produce `.app`, `.tar.xz`, or `.zip` accordingly
+- **Cross-platform dist targets** — `make dist-darwin`, `make dist-linux`, `make dist-windows` build for each platform via `fyne-cross`; `make dist` builds all three in one shot
 
 ### Changed
 - **Schedule-change reconciliation** — when a medication's frequency or time slots are edited, pending intakes for removed slots are deleted immediately and new pending intakes are created for added slots; taken/skipped/missed entries are always preserved
 - **Deactivation reconciliation** — pausing a medication (Active unchecked) removes only pending intakes for today; taken entries are preserved
 - **Fyne upgraded v2.5.4 → v2.7.2** — required by the fyne-x Calendar widget
+- **Cross-platform first** — MedTrack is a first-class cross-platform app; Linux and Windows are fully supported build targets, not afterthoughts
+- **Makefile `_check_macos` guard** — macOS-only targets (sign, DMG, notarize) now fail fast with a clear error on non-macOS hosts instead of silent tool-not-found failures
 
 ### Fixed
 - **Future-date blocking on log filter** — From and To fields reject dates beyond today; the calendar picker shows an error dialog if a future date is tapped

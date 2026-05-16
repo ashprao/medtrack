@@ -32,6 +32,21 @@ DMG_NAME    := $(APP_NAME)-$(VERSION).dmg
 # Detect GOPATH/bin for tool availability checks
 GOBIN       := $(shell go env GOPATH)/bin
 
+# Detect host platform for platform-aware packaging
+# FYNE_OS  — value passed to fyne package -os
+# PACKAGE_EXT — file extension of the produced package artifact
+GOOS        := $(shell go env GOOS)
+ifeq ($(GOOS),darwin)
+  FYNE_OS     := darwin
+  PACKAGE_EXT := .app
+else ifeq ($(GOOS),windows)
+  FYNE_OS     := windows
+  PACKAGE_EXT := .zip
+else
+  FYNE_OS     := linux
+  PACKAGE_EXT := .tar.xz
+endif
+
 # ── Code signing identities (override via environment) ─────────────────────
 # Ad-hoc signing is always available (no Apple account needed).
 # Set DEVELOPER_ID to enable Developer ID signing for Gatekeeper-accepted
@@ -47,7 +62,7 @@ TEAM_ID       ?=
 .PHONY: help
 help:
 	@echo ""
-	@echo "  MedTrack v$(VERSION) — build targets"
+	@echo "  MedTrack v$(VERSION) — build targets  [host: $(GOOS)]"
 	@echo ""
 	@echo "  Setup"
 	@echo "    make tools              Install fyne and fyne-cross CLIs"
@@ -57,30 +72,29 @@ help:
 	@echo "    make test               Run all tests"
 	@echo "    make run                Build and launch the app"
 	@echo ""
-	@echo "  Packaging (macOS)"
-	@echo "    make package            fyne package → $(APP_BUNDLE)  (debug build)"
-	@echo "    make package-release    fyne package → $(APP_BUNDLE)  (stripped)"
-	@echo "    make install            fyne install  → /Applications"
+	@echo "  Packaging  (platform-aware: produces .app / .tar.xz / .zip for host OS)"
+	@echo "    make package            fyne package → $(APP_NAME)$(PACKAGE_EXT)  (debug build)"
+	@echo "    make package-release    fyne package → $(APP_NAME)$(PACKAGE_EXT)  (stripped)"
+	@echo "    make install            fyne install → system app location"
 	@echo ""
-	@echo "  Code Signing"
-	@echo "    make sign-adhoc         Ad-hoc sign (local use only, no Apple account)"
+	@echo "  Cross-platform distribution  (fyne-cross, runs from any host)"
+	@echo "    make dist-darwin        Build macOS bundles (amd64 + arm64) → fyne-cross/dist/"
+	@echo "    make dist-linux         Build Linux packages (amd64 + arm64) → fyne-cross/dist/"
+	@echo "    make dist-windows       Build Windows packages (amd64) → fyne-cross/dist/"
+	@echo "    make dist               Build all three platforms in one shot"
+	@echo ""
+	@echo "  macOS Distribution  (requires macOS)"
+	@echo "    make sign-adhoc         Ad-hoc sign MedTrack.app (local use only, no Apple account)"
 	@echo "    make sign               Developer ID sign (set DEVELOPER_ID env var)"
-	@echo ""
-	@echo "  DMG"
 	@echo "    make dmg                Build + ad-hoc sign + wrap into $(DMG_NAME)"
 	@echo "    make dmg-signed         Build + Developer ID sign + wrap + sign DMG"
-	@echo ""
-	@echo "  Notarization  (requires APPLE_ID, APP_PASSWORD, TEAM_ID)"
-	@echo "    make notarize           Submit $(DMG_NAME) to Apple for notarization"
+	@echo "    make notarize           Submit $(DMG_NAME) to Apple  (requires APPLE_ID, APP_PASSWORD, TEAM_ID)"
 	@echo "    make staple             Staple notarization ticket to $(DMG_NAME)"
-	@echo ""
-	@echo "  Cross-platform"
-	@echo "    make dist               fyne-cross darwin (amd64 + arm64)"
 	@echo ""
 	@echo "  Release"
 	@echo "    make check-version      Validate version consistency across files"
-	@echo "    make release            check-version + package-release + sign-adhoc + dmg"
-	@echo "    make release-signed     check-version + package-release + sign + dmg-signed + notarize + staple"
+	@echo "    make release            check-version + package-release + sign-adhoc + dmg  (macOS)"
+	@echo "    make release-signed     check-version + sign + dmg-signed + notarize + staple  (macOS)"
 	@echo ""
 	@echo "  Maintenance"
 	@echo "    make clean              Remove build artifacts"
@@ -122,21 +136,31 @@ _check_fyne:
 
 .PHONY: package
 package: _check_icon _check_fyne
-	cd $(CMD_PKG) && $(GOBIN)/fyne package -os darwin
-	@mv $(CMD_PKG)/$(APP_BUNDLE) . 2>/dev/null || true
-	@echo "✓ $(APP_BUNDLE) created"
+	cd $(CMD_PKG) && $(GOBIN)/fyne package -os $(FYNE_OS)
+	@mv $(CMD_PKG)/$(APP_NAME)$(PACKAGE_EXT) . 2>/dev/null || true
+	@echo "✓ $(APP_NAME)$(PACKAGE_EXT) created  [$(FYNE_OS)]"
 
 .PHONY: package-release
 package-release: _check_icon _check_fyne
-	cd $(CMD_PKG) && $(GOBIN)/fyne package -os darwin -release
-	@mv $(CMD_PKG)/$(APP_BUNDLE) . 2>/dev/null || true
-	@echo "✓ $(APP_BUNDLE) created (release build)"
+	cd $(CMD_PKG) && $(GOBIN)/fyne package -os $(FYNE_OS) -release
+	@mv $(CMD_PKG)/$(APP_NAME)$(PACKAGE_EXT) . 2>/dev/null || true
+	@echo "✓ $(APP_NAME)$(PACKAGE_EXT) created (release build)  [$(FYNE_OS)]"
+
+# ── Platform guard ────────────────────────────────────────────────────────
+# Applied to targets that require macOS-exclusive tools (codesign, hdiutil,
+# xcrun). Fails fast with a clear message on Linux and Windows.
+.PHONY: _check_macos
+_check_macos:
+	@[ "$(GOOS)" = "darwin" ] || { \
+		echo "✗ This target requires macOS (codesign / hdiutil / xcrun)."; \
+		echo "  For cross-platform packaging use: make package  or  make dist"; \
+		exit 1; }
 
 # ── Code Signing ───────────────────────────────────────────────────────────
 # Ad-hoc signing: the app will run on your Mac only.
 # Gatekeeper will block it on other Macs unless they right-click → Open.
 .PHONY: sign-adhoc
-sign-adhoc:
+sign-adhoc: _check_macos
 	@test -d $(APP_BUNDLE) || { echo "✗ $(APP_BUNDLE) not found — run make package first"; exit 1; }
 	codesign --sign - --deep --force "$(APP_BUNDLE)"
 	@echo "✓ Ad-hoc signed $(APP_BUNDLE)"
@@ -144,7 +168,7 @@ sign-adhoc:
 # Developer ID signing: accepted by Gatekeeper on any Mac.
 # Requires: export DEVELOPER_ID="Developer ID Application: Your Name (TEAMID)"
 .PHONY: sign
-sign:
+sign: _check_macos
 	@test -d $(APP_BUNDLE) || { echo "✗ $(APP_BUNDLE) not found — run make package-release first"; exit 1; }
 	@test -n "$(DEVELOPER_ID)" || { \
 		echo "✗ DEVELOPER_ID is not set."; \
@@ -163,7 +187,7 @@ sign:
 
 # ── DMG ────────────────────────────────────────────────────────────────────
 .PHONY: _make_dmg
-_make_dmg:
+_make_dmg: _check_macos
 	@test -d $(APP_BUNDLE) || { echo "✗ $(APP_BUNDLE) not found"; exit 1; }
 	hdiutil create \
 		-volname "$(APP_NAME)" \
@@ -193,7 +217,7 @@ _check_notarize_env:
 	@test -n "$(TEAM_ID)"      || { echo "✗ TEAM_ID is not set";      exit 1; }
 
 .PHONY: notarize
-notarize: _check_notarize_env
+notarize: _check_macos _check_notarize_env
 	@test -f "$(DMG_NAME)" || { echo "✗ $(DMG_NAME) not found — run make dmg-signed first"; exit 1; }
 	xcrun notarytool submit "$(DMG_NAME)" \
 		--apple-id "$(APPLE_ID)" \
@@ -203,7 +227,7 @@ notarize: _check_notarize_env
 	@echo "✓ Notarization complete"
 
 .PHONY: staple
-staple:
+staple: _check_macos
 	@test -f "$(DMG_NAME)" || { echo "✗ $(DMG_NAME) not found"; exit 1; }
 	xcrun stapler staple "$(DMG_NAME)"
 	@echo "✓ Notarization ticket stapled to $(DMG_NAME)"
@@ -214,12 +238,31 @@ install: _check_icon _check_fyne
 	@echo "✓ $(APP_NAME) installed to /Applications/$(APP_BUNDLE)"
 
 # ── Cross-platform ─────────────────────────────────────────────────────────
-.PHONY: dist
-dist:
+.PHONY: _check_fyne_cross
+_check_fyne_cross:
 	@command -v $(GOBIN)/fyne-cross >/dev/null 2>&1 || { \
 		echo "✗ fyne-cross not found — run: make tools"; exit 1; }
+
+# Per-platform dist targets — each cross-compiles for that OS.
+# Output lands in fyne-cross/dist/ .
+.PHONY: dist-darwin
+dist-darwin: _check_fyne_cross
 	$(GOBIN)/fyne-cross darwin -arch amd64,arm64 -app-id $(APP_ID) $(CMD_PKG)
-	@echo "✓ Cross-compiled bundles → fyne-cross/dist/"
+	@echo "✓ darwin bundles → fyne-cross/dist/"
+
+.PHONY: dist-linux
+dist-linux: _check_fyne_cross
+	$(GOBIN)/fyne-cross linux -arch amd64,arm64 -app-id $(APP_ID) $(CMD_PKG)
+	@echo "✓ linux packages → fyne-cross/dist/"
+
+.PHONY: dist-windows
+dist-windows: _check_fyne_cross
+	$(GOBIN)/fyne-cross windows -arch amd64 -app-id $(APP_ID) $(CMD_PKG)
+	@echo "✓ windows packages → fyne-cross/dist/"
+
+# dist: build for all three platforms in one shot.
+.PHONY: dist
+dist: dist-darwin dist-linux dist-windows
 
 # ── Release ────────────────────────────────────────────────────────────────
 .PHONY: check-version
