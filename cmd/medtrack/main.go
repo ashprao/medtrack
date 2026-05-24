@@ -221,13 +221,40 @@ func main() {
 		// Initialize medication log view
 		medicationLog = views.NewMedicationLog(dbManager, mainWindow)
 
-		// Ensure and load initial daily intakes (active medications only)
+		// Ensure and load initial daily intakes (active medications only).
+		// Strategy: backfill every day from the earliest known intake to today.
+		// EnsureDailyIntakes is idempotent — days that already have entries are
+		// a cheap no-op (one SELECT, zero INSERTs). This fills any gaps caused
+		// by days the app was not launched (e.g. weekends).
+		// If no intakes exist yet, fall back to the earliest medication start date.
 		activeMeds := filterActiveMeds(medications)
-		if err := dbManager.EnsureDailyIntakes(time.Now(), activeMeds); err != nil {
-			log.Printf("Error ensuring daily intakes: %v", err)
+		today := time.Now()
+		startOfToday := time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, time.Local)
+
+		startDay := startOfToday // default: today only
+		earliest, err := dbManager.GetEarliestScheduledDate()
+		if err != nil {
+			log.Printf("Error querying earliest scheduled date: %v", err)
+		} else if !earliest.IsZero() {
+			startDay = time.Date(earliest.Year(), earliest.Month(), earliest.Day(), 0, 0, 0, 0, time.Local)
+		} else {
+			// No intakes yet — backfill from the earliest active medication's start date.
+			for _, med := range activeMeds {
+				if med.StartDate.IsZero() {
+					continue
+				}
+				d := time.Date(med.StartDate.Year(), med.StartDate.Month(), med.StartDate.Day(), 0, 0, 0, 0, time.Local)
+				if d.Before(startDay) {
+					startDay = d
+				}
+			}
 		}
-		// Mark any pending intakes from previous days as missed
-		startOfToday := time.Now().Truncate(24 * time.Hour)
+		for d := startDay; !d.After(today); d = d.AddDate(0, 0, 1) {
+			if err := dbManager.EnsureDailyIntakes(d, activeMeds); err != nil {
+				log.Printf("Error ensuring daily intakes for %s: %v", d.Format("2006-01-02"), err)
+			}
+		}
+		// Mark any pending intakes from previous days as missed.
 		if err := dbManager.MarkMissedIntakes(startOfToday); err != nil {
 			log.Printf("Error marking missed intakes: %v", err)
 		}
@@ -238,6 +265,8 @@ func main() {
 			dailyIntake.UpdateMedications(filterActiveMeds(medications))
 			dailyIntake.UpdateIntakes(filterIntakesForActiveMeds(intakes, medications))
 		}
+		// Refresh the medication log so backfilled history is visible immediately.
+		medicationLog.RefreshData()
 	}
 
 	// "About" (exactly) causes Fyne's macOS driver to move this item into the

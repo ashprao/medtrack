@@ -511,6 +511,24 @@ func (m *Manager) DeleteMedication(id int64) error {
 	return nil
 }
 
+// GetEarliestScheduledDate returns the earliest scheduled_for date in the
+// intakes table, converted to the local timezone. Returns a zero Time if the
+// table is empty. Used on first launch to backfill all gaps from the very
+// first recorded day up to today.
+func (m *Manager) GetEarliestScheduledDate() (time.Time, error) {
+	// Use ORDER BY + LIMIT 1 so go-sqlite3 scans the column value directly into
+	// time.Time. MIN() returns a raw driver string that cannot be scanned that way.
+	var t time.Time
+	err := m.db.QueryRow(`SELECT scheduled_for FROM intakes ORDER BY scheduled_for ASC LIMIT 1`).Scan(&t)
+	if err == sql.ErrNoRows {
+		return time.Time{}, nil
+	}
+	if err != nil {
+		return time.Time{}, fmt.Errorf("error querying earliest scheduled date: %v", err)
+	}
+	return t.In(time.Local), nil
+}
+
 // GetCounts returns the total number of medications and intake records.
 // Used to show the user the exact impact before a destructive action.
 func (m *Manager) GetCounts() (medCount int, intakeCount int, err error) {

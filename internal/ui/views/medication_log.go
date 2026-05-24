@@ -19,6 +19,7 @@ import (
 // MedicationLog struct holds the data and UI components for displaying a log of medication intakes
 type MedicationLog struct {
 	container    *fyne.Container
+	scroll       *container.Scroll // vertical scroll wrapping content
 	dbManager    *db.Manager
 	window       fyne.Window
 	fromDate     *widget.Entry
@@ -27,6 +28,8 @@ type MedicationLog struct {
 	medications  []models.Medication
 	dateRangeBox *fyne.Container
 	content      *fyne.Container
+	focusDate    string            // "2006-01-02" of the date to keep open/visible on refresh
+	focusWidget  fyne.CanvasObject // accordion widget for focusDate; used to scroll to it
 }
 
 // logEntry represents a single row in the log table
@@ -54,10 +57,16 @@ func NewMedicationLog(dbManager *db.Manager, window fyne.Window) *MedicationLog 
 
 	// Create date range selectors with calendar pickers.
 	now := time.Now()
-	oneWeekAgo := now.AddDate(0, 0, -7)
+
+	// Default fromDate to the earliest intake in the DB so all records are shown
+	// on startup. Fall back to one week ago if there are no records yet.
+	fromDefault := now.AddDate(0, 0, -7)
+	if earliest, err := m.dbManager.GetEarliestScheduledDate(); err == nil && !earliest.IsZero() {
+		fromDefault = earliest
+	}
 
 	var fromDateContainer, toDateContainer *fyne.Container
-	m.fromDate, fromDateContainer = newDateEntryWithPicker(oneWeekAgo, window, false)
+	m.fromDate, fromDateContainer = newDateEntryWithPicker(fromDefault, window, false)
 	m.toDate, toDateContainer = newDateEntryWithPicker(now, window, false, m.fromDate)
 
 	refreshButton := widget.NewButtonWithIcon("Refresh", theme.ViewRefreshIcon(), func() {
@@ -105,6 +114,7 @@ func NewMedicationLog(dbManager *db.Manager, window fyne.Window) *MedicationLog 
 	// Create scrollable content area
 	m.content = container.NewVBox()
 	scrollContent := container.NewVScroll(m.content)
+	m.scroll = scrollContent
 
 	// Create main container
 	m.container = container.NewBorder(
@@ -155,6 +165,10 @@ func (m *MedicationLog) UpdateData(from, to time.Time) {
 
 // renderTable updates the table with the current data
 func (m *MedicationLog) renderTable() {
+	focusDate := m.focusDate
+	m.focusDate = ""
+	m.focusWidget = nil
+
 	// Clear existing content
 	m.content.RemoveAll()
 
@@ -300,6 +314,7 @@ func (m *MedicationLog) renderTable() {
 					log.Printf("Error deleting intake %d: %v", e.intakeID, err)
 					return
 				}
+				m.focusDate = e.scheduledAt.Format("2006-01-02")
 				m.RefreshData()
 			}, fyne.CurrentApp().Driver().AllWindows()[0]).Show()
 		})
@@ -331,6 +346,7 @@ func (m *MedicationLog) renderTable() {
 							log.Printf("Error marking intake %d as taken: %v", e.intakeID, err)
 							return
 						}
+						m.focusDate = e.scheduledAt.Format("2006-01-02")
 						m.RefreshData()
 					},
 					fyne.CurrentApp().Driver().AllWindows()[0],
@@ -360,12 +376,14 @@ func (m *MedicationLog) renderTable() {
 		return container.NewPadded(rows)
 	}
 
-	// Render: month section header + per-date accordion
+	// Render: month section header, then one accordion widget per date.
+	// One-accordion-per-date lets us hold a direct widget reference for the
+	// focusDate so we can scroll to its exact position after layout.
 	today := time.Now().Format("2006-01-02")
-	firstAccordion := true // track so we auto-open only the most recent date
+	firstDate := true // track so we auto-open only the most recent date
 
 	for _, mg := range months {
-		// Month section label — non-interactive landmark for scrolling
+		// Month section label
 		monthLabel := widget.NewLabelWithStyle(
 			mg.month.Format("January 2006"),
 			fyne.TextAlignLeading,
@@ -374,10 +392,10 @@ func (m *MedicationLog) renderTable() {
 		monthLabel.Importance = widget.MediumImportance
 		m.content.Add(container.NewPadded(monthLabel))
 
-		// Build accordion items for each date in this month
-		var accordionItems []*widget.AccordionItem
+		// One accordion widget per date in this month.
 		for _, dg := range mg.dateGroups {
 			dg := dg // capture
+			dateStr := dg.date.Format("2006-01-02")
 			n := len(dg.entries)
 			entryWord := "entries"
 			if n == 1 {
@@ -391,23 +409,31 @@ func (m *MedicationLog) renderTable() {
 			for _, entry := range dg.entries {
 				rows.Add(createLogRow(entry))
 			}
-			accordionItems = append(accordionItems, widget.NewAccordionItem(title, rows))
-		}
+			acc := widget.NewAccordion(widget.NewAccordionItem(title, rows))
 
-		acc := widget.NewAccordion(accordionItems...)
-		acc.MultiOpen = true
-
-		// Auto-open the most recent date (index 0) of the first (most recent) month.
-		// Also auto-open any accordion item whose date is today.
-		for i, dg := range mg.dateGroups {
-			if (firstAccordion && i == 0) || dg.date.Format("2006-01-02") == today {
-				acc.Open(i)
+			// Auto-open the most recent date, today, or the user's focus date.
+			if (firstDate) || dateStr == today || dateStr == focusDate {
+				acc.Open(0)
 			}
-		}
-		firstAccordion = false
+			firstDate = false
 
-		m.content.Add(acc)
+			// Keep a reference to the focusDate accordion so we can scroll to it.
+			if dateStr == focusDate {
+				m.focusWidget = acc
+			}
+
+			m.content.Add(acc)
+		}
 		m.content.Add(widget.NewLabel("")) // breathing room between months
+	}
+
+	// Scroll to the focusDate accordion after Fyne completes its layout pass.
+	if m.focusWidget != nil {
+		target := m.focusWidget
+		go func() {
+			time.Sleep(100 * time.Millisecond)
+			m.scroll.ScrollToOffset(fyne.NewPos(0, target.Position().Y))
+		}()
 	}
 }
 
