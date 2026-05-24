@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.2.1] - 2026-05-24
+### Fixed
+- **Log history gaps on startup** — app now backfills every day from the earliest known intake to today, not just today; gaps caused by days the app was not launched are filled automatically
+- **Scroll-to-date UX** — after marking a dose taken or deleting an entry on a past date, the log view stays scrolled to that date instead of jumping back to today
+- **Log shows all records on startup** — the From date filter now defaults to the earliest intake in the database rather than one week ago
+
+### Changed
+- **Log accordion structure** — one accordion widget per date (was one per month); enables precise scroll targeting after refresh
+
 ## [v1.2.0] - 2026-05-14
 ### Added
 - **Active/Inactive toggle** — each medication card has an Active checkbox; unchecking it pauses the medication so it is excluded from Daily Intake without deleting it

@@ -13,7 +13,7 @@ A cross-platform desktop application for managing medication schedules and track
 MedTrack lets you maintain a medication list, view a daily schedule grouped by time of day, mark doses as taken, and review a historical log with date-range filtering. Data is stored locally in a SQLite database — no network connection required.
 
 ![About MedTrack](screenshots/about.png)
-*MedTrack v1.2.0 — About dialog*
+*MedTrack v1.2.1 — About dialog*
 
 ---
 
@@ -93,7 +93,7 @@ All platforms require **Go 1.23+** and a C compiler (CGO is required by `go-sqli
 ### Option 1 — Quick install (end users)
 
 ```bash
-go install github.com/ashprao/medtrack/cmd/medtrack@v1.2.0
+go install github.com/ashprao/medtrack/cmd/medtrack@v1.2.1
 ```
 
 The binary is installed to `$GOPATH/bin` (or `~/go/bin` if `GOPATH` is not set). Ensure that directory is on your `$PATH`.
@@ -295,6 +295,7 @@ See [CHANGELOG.md](CHANGELOG.md) for full details.
 
 | Version | Date | Summary |
 |---------|------|---------|
+| v1.2.1 | May 2026 | Fix log history gaps; scroll-to-date UX after mark taken/delete; show all records on startup |
 | v1.2.0 | May 2026 | Calendar date pickers, date validation, cross-platform packaging |
 | v1.1.0 | May 2026 | PRN medications, smart taken-at recording, log layout refactor, bedtime scheduling, soft-delete |
 | v0.2.0 | March 2025 | Medication log with date filtering |
